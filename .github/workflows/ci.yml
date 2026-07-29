@@ -18,6 +18,13 @@ on:
 
 env:
   CLINK_VERSION: v0.3.0
+  # Build the pinned Arrow without the object-store filesystems (s3://,
+  # gs://, abfs://) - nothing here uses them, and it is what lets the
+  # toolchain build on a bare runner: the prebuilt archive's Arrow was
+  # compiled against an aws-sdk living at /usr/local, which only clink's
+  # build image and install-system-deps.sh provide. The cost is a one-off
+  # from-source Arrow build, paid only when the cache key rolls.
+  CLINK_ARROW_OBJECT_STORES: "OFF"
 
 jobs:
   scenes:
@@ -32,7 +39,7 @@ jobs:
           path: |
             .clink
             ~/.clink-deps
-          key: clink-${{ env.CLINK_VERSION }}-${{ runner.os }}-${{ runner.arch }}-v1
+          key: clink-${{ env.CLINK_VERSION }}-${{ runner.os }}-${{ runner.arch }}-obj${{ env.CLINK_ARROW_OBJECT_STORES }}-v1
 
       - name: Build tooling and clink's system dependencies
         # The -dev packages are what clink's pinned Arrow expects on the
