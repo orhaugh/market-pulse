@@ -11,6 +11,12 @@
 #   CLINK_IMAGE=...   override the runtime image (default: the pinned release)
 #   KEEP_UP=1         leave the cluster running after the gate
 #
+# The published runtime image is linux/amd64. On Apple silicon either run it
+# emulated (DOCKER_DEFAULT_PLATFORM=linux/amd64 cluster/run.sh) or build the
+# image natively from a clink checkout:
+#   docker build -t clink-runtime:latest -f docker/Dockerfile.runtime .
+#   CLINK_IMAGE=clink-runtime:latest cluster/run.sh
+#
 # A streaming source never sees the end of time: watermarks only advance
 # when events arrive, so after the last real trade the final windows would
 # stay open forever. The scene does what a real feed does - it sends
