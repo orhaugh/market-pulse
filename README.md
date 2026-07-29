@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/orhaugh/market-pulse/actions/workflows/ci.yml/badge.svg)](https://github.com/orhaugh/market-pulse/actions/workflows/ci.yml)
 [![licence](https://img.shields.io/badge/licence-Apache--2.0-blue.svg)](LICENSE)
-[![clink](https://img.shields.io/badge/clink-v0.3.0-lightgrey.svg)](https://github.com/orhaugh/clink/releases/tag/v0.3.0)
+[![clink](https://img.shields.io/badge/clink-v0.4.0-lightgrey.svg)](https://github.com/orhaugh/clink/releases/tag/v0.4.0)
 
 A market-data pipeline built on [clink](https://github.com/orhaugh/clink),
 the embedded-first, Arrow-native stream processing engine. One deterministic
@@ -15,14 +15,14 @@ pinned clink release the way any project would, runs SQL scenes through the
 `clink` CLI, builds a native operator against the installed CMake package,
 and verifies everything against an independent oracle. It doubles as a
 worked example and as an integration test of the release it pins
-(currently **v0.3.0** - its first run against an installed prefix found
+(currently **v0.4.0** - its first run against an installed prefix found
 three real defects that were fixed before that release was tagged).
 
 - [Why a stream engine, and why clink](#why-a-stream-engine-and-why-clink)
 - [Quick start](#quick-start)
 - [How the repository fits together](#how-the-repository-fits-together)
 - [The tape](#the-tape) · [The scenes](#the-scenes) · [The native operator](#the-native-operator)
-- [State is data, incidents replay](#state-is-data-incidents-replay) · [Python](#python) · [The same SQL, on a cluster](#the-same-sql-on-a-cluster)
+- [State is data, incidents replay](#state-is-data-incidents-replay) · [Python](#python) · [The same SQL, on a cluster](#the-same-sql-on-a-cluster) · [on a live feed](#the-same-sql-on-a-live-feed)
 - [Verification](#verification) · [Pinning](#pinning)
 
 ## Why a stream engine, and why clink
@@ -79,12 +79,13 @@ demonstrates them.
 ## Quick start
 
 Three commands: install the pinned release, generate the tape, run the
-scenes. The clink build is quick; the one-off toolchain bootstrap downloads
-a prebuilt archive on macOS arm64 and Linux x86_64/arm64, and compiles from
-source elsewhere.
+scenes. On Linux x86_64 the install is a prebuilt SDK download from the
+clink release (about a minute, no compiler); elsewhere it builds from
+source, with the toolchain restored from a prebuilt archive where one
+exists.
 
 ```bash
-scripts/get-clink.sh            # clone the release tag, build, install into .clink/
+scripts/get-clink.sh            # prebuilt SDK, or build the tag into .clink/
 python3 tools/mpgen.py --out data
 scripts/run-scenes.sh           # all eight SQL scenes + verification
 ```
@@ -245,6 +246,28 @@ submitted to a cluster do not yet take a per-job checkpoint configuration
 (compiled-job submissions do), so this scene gates on exact counts instead
 of demonstrating kill-a-worker recovery.
 
+## The same SQL, on a live feed
+
+```bash
+scripts/scene-live.sh                                    # ~2000 live trades
+LIVE_SYMBOL=ethusdt LIVE_MESSAGES=10000 scripts/scene-live.sh
+BINANCE_HOST=stream.binance.us scripts/scene-live.sh     # geo-restricted regions
+```
+
+clink v0.4.0's WebSocket source connects straight to a public exchange
+trade stream over `wss://` - no broker, no API key - and the same candle
+query turns live prints into one-minute bars in one process. The venue is
+configurable (`LIVE_URL`/`LIVE_SUBSCRIBE` plus column overrides work for
+any venue with flat JSON trade messages; nested-envelope venues such as OKX
+need a small re-publisher in front).
+
+Two deliberate boundaries. This scene is not in CI: a hermetic build must
+not depend on an exchange's uptime or a runner's geography. And it does not
+replace the tape: a live feed is non-deterministic and delivery is
+at-most-once (a push stream has no offsets), so the oracle and golden
+checks - the point of this repository - stay on the deterministic
+generator. The tape verifies; the feed demonstrates.
+
 ## Verification
 
 `tools/check.py` recomputes what the scenes should have produced - totals
@@ -257,9 +280,9 @@ replay scenes.
 
 ## Pinning
 
-`scripts/get-clink.sh` pins `CLINK_VERSION` (default v0.3.0) and installs
+`scripts/get-clink.sh` pins `CLINK_VERSION` (default v0.4.0) and installs
 into `.clink/` inside the repository; nothing touches system paths. To try
-a newer clink: `CLINK_VERSION=v0.4.0 scripts/get-clink.sh` and re-run the
+a newer clink: `CLINK_VERSION=v0.5.0 scripts/get-clink.sh` and re-run the
 scenes - the golden checks make regressions visible immediately.
 
 ## Licence

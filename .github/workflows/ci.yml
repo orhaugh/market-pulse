@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
 
 env:
-  CLINK_VERSION: v0.3.0
+  CLINK_VERSION: v0.4.0
   # Build the pinned Arrow without the object-store filesystems (s3://,
   # gs://, abfs://) - nothing here uses them, and it is what lets the
   # toolchain build on a bare runner: the prebuilt archive's Arrow was

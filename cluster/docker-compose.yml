@@ -31,7 +31,7 @@ services:
       retries: 24
 
   coordinator:
-    image: ${CLINK_IMAGE:-ghcr.io/orhaugh/clink-runtime:0.3.0}
+    image: ${CLINK_IMAGE:-ghcr.io/orhaugh/clink-runtime:0.4.0}
     # The published runtime image is linux/amd64 only; declaring it here keeps
     # Kafka native everywhere and runs the clink services emulated on arm64.
     platform: linux/amd64
@@ -48,7 +48,7 @@ services:
       retries: 30
 
   worker1:
-    image: ${CLINK_IMAGE:-ghcr.io/orhaugh/clink-runtime:0.3.0}
+    image: ${CLINK_IMAGE:-ghcr.io/orhaugh/clink-runtime:0.4.0}
     platform: linux/amd64
     command: >
       clink_node --role=worker --id=worker-1
@@ -64,7 +64,7 @@ services:
     restart: on-failure
 
   worker2:
-    image: ${CLINK_IMAGE:-ghcr.io/orhaugh/clink-runtime:0.3.0}
+    image: ${CLINK_IMAGE:-ghcr.io/orhaugh/clink-runtime:0.4.0}
     platform: linux/amd64
     command: >
       clink_node --role=worker --id=worker-2
