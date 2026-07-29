@@ -1,0 +1,18 @@
+# Generated market data and run outputs
+/data/
+/out/
+
+# The pinned clink checkout + local install prefix (scripts/get-clink.sh)
+/.clink/
+
+# Build trees
+build/
+build-*/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Editor / OS noise
+.DS_Store
