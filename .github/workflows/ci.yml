@@ -95,6 +95,9 @@ jobs:
         run: scripts/scene-replay.sh
 
       - name: Python scene (pyclink over libclink)
+        # pyclink installs from the pinned tag's python/ subdirectory - the
+        # SDK fast path never materialises a source checkout, and the SDK
+        # already carries the libclink.so the package drives.
         run: |
-          python3 -m pip install --quiet .clink/src/python
+          python3 -m pip install --quiet pyarrow "git+https://github.com/orhaugh/clink@${CLINK_VERSION}#subdirectory=python"
           CLINK_LIB=$PWD/.clink/prefix/lib/libclink.so python3 python/candles.py

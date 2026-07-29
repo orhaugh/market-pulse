@@ -214,7 +214,7 @@ state, golden emissions and a generated test.
 ## Python
 
 ```bash
-pip install pyarrow && pip install .clink/src/python
+pip install pyarrow "git+https://github.com/orhaugh/clink@v0.4.0#subdirectory=python"
 export CLINK_LIB=$PWD/.clink/prefix/lib/libclink.dylib   # .so on Linux
 python3 python/candles.py
 ```
