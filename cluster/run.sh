@@ -11,9 +11,9 @@
 #   CLINK_IMAGE=...   override the runtime image (default: the pinned release)
 #   KEEP_UP=1         leave the cluster running after the gate
 #
-# The published runtime image is linux/amd64. On Apple silicon either run it
-# emulated (DOCKER_DEFAULT_PLATFORM=linux/amd64 cluster/run.sh) or build the
-# image natively from a clink checkout:
+# The published runtime image is linux/amd64 (declared in the compose file,
+# so arm64 hosts run the clink services emulated, Kafka native). For a fully
+# native arm64 run, build the image from a clink checkout:
 #   docker build -t clink-runtime:latest -f docker/Dockerfile.runtime .
 #   CLINK_IMAGE=clink-runtime:latest cluster/run.sh
 #

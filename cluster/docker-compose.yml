@@ -32,6 +32,9 @@ services:
 
   coordinator:
     image: ${CLINK_IMAGE:-ghcr.io/orhaugh/clink-runtime:0.3.0}
+    # The published runtime image is linux/amd64 only; declaring it here keeps
+    # Kafka native everywhere and runs the clink services emulated on arm64.
+    platform: linux/amd64
     command: >
       clink_node --role=coordinator --port=6123
                  --bind-host=0.0.0.0 --advertise-host=coordinator
@@ -46,6 +49,7 @@ services:
 
   worker1:
     image: ${CLINK_IMAGE:-ghcr.io/orhaugh/clink-runtime:0.3.0}
+    platform: linux/amd64
     command: >
       clink_node --role=worker --id=worker-1
                  --coordinator-host=coordinator --coordinator-port=6123
@@ -61,6 +65,7 @@ services:
 
   worker2:
     image: ${CLINK_IMAGE:-ghcr.io/orhaugh/clink-runtime:0.3.0}
+    platform: linux/amd64
     command: >
       clink_node --role=worker --id=worker-2
                  --coordinator-host=coordinator --coordinator-port=6123
