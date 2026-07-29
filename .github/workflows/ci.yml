@@ -29,6 +29,9 @@ env:
   # ubuntu-24.04's default gcc-13 lacks the library side, gcc-14 has it.
   CC: gcc-14
   CXX: g++-14
+  # A no-object-store Arrow cannot link iceberg-cpp (its bundle references
+  # Arrow's S3 symbols unconditionally), and nothing here uses Iceberg.
+  CLINK_SKIP_ICEBERG: "1"
 
 jobs:
   scenes:
