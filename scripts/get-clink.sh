@@ -41,6 +41,34 @@ fi
 
 echo "== market-pulse: installing clink ${CLINK_VERSION} into ${PREFIX}"
 
+# Fast path: a prebuilt SDK tarball on the release (published from v0.4.0
+# onwards for linux x86_64, glibc floor Ubuntu 24.04). Download, verify the
+# published checksum, extract - about a minute, no compiler involved. Any
+# miss (other platform, older release, no network) falls through to the
+# source build below. CLINK_FROM_SOURCE=1 skips the attempt entirely.
+if [[ "${CLINK_FROM_SOURCE:-0}" != "1" && "$(uname -s)" == "Linux" && "$(uname -m)" == "x86_64" ]]; then
+    asset="clink-${CLINK_VERSION}-linux-x86_64-ubuntu24.04.tar.gz"
+    base="${CLINK_REPO%.git}/releases/download/${CLINK_VERSION}"
+    tmp="$(mktemp -d)"
+    echo "-- trying the prebuilt SDK: ${base}/${asset}"
+    if curl -fsSL -o "${tmp}/${asset}" "${base}/${asset}" \
+       && curl -fsSL -o "${tmp}/${asset}.sha256" "${base}/${asset}.sha256"; then
+        ( cd "${tmp}" && sha256sum -c "${asset}.sha256" >/dev/null )
+        mkdir -p "${ROOT}/.clink"
+        rm -rf "${PREFIX}"
+        tar xzf "${tmp}/${asset}" -C "${tmp}"
+        mv "${tmp}/${asset%.tar.gz}" "${PREFIX}"
+        rm -rf "${tmp}"
+        echo "${CLINK_VERSION}" > "${STAMP}"
+        echo "== clink ${CLINK_VERSION} installed from the prebuilt SDK."
+        echo "   CLI:            ${PREFIX}/bin/clink"
+        echo "   CMake package:  ${PREFIX}/lib/cmake/clink (use -DCMAKE_PREFIX_PATH=${PREFIX})"
+        exit 0
+    fi
+    rm -rf "${tmp}"
+    echo "-- no prebuilt SDK for this release/platform; building from source"
+fi
+
 # 1. The release source, shallow, at the pinned tag.
 if [[ -d "${SRC}/.git" ]]; then
     have="$(git -C "${SRC}" describe --tags --exact-match 2>/dev/null || true)"
