@@ -99,5 +99,6 @@ jobs:
         # SDK fast path never materialises a source checkout, and the SDK
         # already carries the libclink.so the package drives.
         run: |
-          python3 -m pip install --quiet pyarrow "git+https://github.com/orhaugh/clink@${CLINK_VERSION}#subdirectory=python"
+          CLINK_LIB=$PWD/.clink/prefix/lib/libclink.so \
+            python3 -m pip install --quiet pyarrow "git+https://github.com/orhaugh/clink@${CLINK_VERSION}#subdirectory=python"
           CLINK_LIB=$PWD/.clink/prefix/lib/libclink.so python3 python/candles.py

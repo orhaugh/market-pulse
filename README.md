@@ -214,10 +214,13 @@ state, golden emissions and a generated test.
 ## Python
 
 ```bash
-pip install pyarrow "git+https://github.com/orhaugh/clink@v0.4.0#subdirectory=python"
 export CLINK_LIB=$PWD/.clink/prefix/lib/libclink.dylib   # .so on Linux
+pip install pyarrow "git+https://github.com/orhaugh/clink@v0.4.0#subdirectory=python"
 python3 python/candles.py
 ```
+
+`CLINK_LIB` at install time points pyclink's build at the SDK's `libclink`
+instead of compiling one - no compiler needed on this path either.
 
 The same engine, embedded in the Python process through a pure-C ABI; the
 720 bars arrive as a pyarrow table over the Arrow C stream interface, no
