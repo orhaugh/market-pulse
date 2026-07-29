@@ -25,6 +25,10 @@ env:
   # build image and install-system-deps.sh provide. The cost is a one-off
   # from-source Arrow build, paid only when the cache key rolls.
   CLINK_ARROW_OBJECT_STORES: "OFF"
+  # clink and iceberg-cpp are C++23 (std::ranges::to and friends);
+  # ubuntu-24.04's default gcc-13 lacks the library side, gcc-14 has it.
+  CC: gcc-14
+  CXX: g++-14
 
 jobs:
   scenes:
@@ -39,7 +43,7 @@ jobs:
           path: |
             .clink
             ~/.clink-deps
-          key: clink-${{ env.CLINK_VERSION }}-${{ runner.os }}-${{ runner.arch }}-obj${{ env.CLINK_ARROW_OBJECT_STORES }}-v1
+          key: clink-${{ env.CLINK_VERSION }}-${{ runner.os }}-${{ runner.arch }}-obj${{ env.CLINK_ARROW_OBJECT_STORES }}-gcc14-v2
 
       - name: Build tooling and clink's system dependencies
         # The -dev packages are what clink's pinned Arrow expects on the
@@ -49,7 +53,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            cmake build-essential git curl ca-certificates pkg-config \
+            cmake build-essential g++-14 git curl ca-certificates pkg-config \
             libssl-dev libcurl4-openssl-dev libsqlite3-dev libxml2-dev \
             libzstd-dev zlib1g-dev
 
