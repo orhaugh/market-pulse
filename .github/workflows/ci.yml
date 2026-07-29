@@ -34,8 +34,17 @@ jobs:
             ~/.clink-deps
           key: clink-${{ env.CLINK_VERSION }}-${{ runner.os }}-${{ runner.arch }}-v1
 
-      - name: Build tooling
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake ninja-build
+      - name: Build tooling and clink's system dependencies
+        # The -dev packages are what clink's pinned Arrow expects on the
+        # host (its ArrowConfig resolves CURL, OpenSSL, zstd et al at
+        # consumer-configure time; libcurl4-openssl-dev is the one the
+        # stock runner image is missing).
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake build-essential git curl ca-certificates pkg-config \
+            libssl-dev libcurl4-openssl-dev libsqlite3-dev libxml2-dev \
+            libzstd-dev zlib1g-dev
 
       - name: Install the pinned clink release
         run: scripts/get-clink.sh
