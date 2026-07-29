@@ -137,10 +137,12 @@ cluster/run.sh        # docker compose: coordinator + 2 workers + kafka
 ```
 
 brings up a real Coordinator/Worker cluster using the release's published
-runtime image, pipes the tape onto a Kafka topic, submits
-`cluster/candles_kafka.sql` (the distributed twin of scene 01) at
-parallelism 4 through the coordinator's HTTP API, and gates on the exact
-bar count arriving on the output topic. The dashboard at
+runtime image, pipes the tape onto a Kafka topic followed by end-of-session
+marker prints (a streaming source's watermark only advances when events
+arrive, so the markers are what close the final minute - exactly as a real
+feed's session-close messages do), submits `cluster/candles_kafka.sql` (the
+distributed twin of scene 01) at parallelism 4 through the coordinator's
+HTTP API, and gates on exactly 720 bars arriving on the output topic. The dashboard at
 <http://localhost:8081> shows per-operator rates, backpressure and
 watermarks while it runs. Kafka JSON decodes straight to Arrow columns and
 the keyed shuffle moves those columns between workers without materialising

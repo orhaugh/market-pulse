@@ -11,18 +11,23 @@
 #   CLINK_IMAGE=...   override the runtime image (default: the pinned release)
 #   KEEP_UP=1         leave the cluster running after the gate
 #
-# A streaming source never sees the end of time: with a 3-second watermark
-# lag and no further trades, the final simulated minute's windows stay open,
-# so the gate expects 12 symbols x 59 closed minutes = 708 bars.
+# A streaming source never sees the end of time: watermarks only advance
+# when events arrive, so after the last real trade the final windows would
+# stay open forever. The scene does what a real feed does - it sends
+# end-of-session marker prints, timestamped past the hour, which push the
+# event clock over every window boundary. All 60 minutes then fire:
+# 12 symbols x 60 minutes = 720 bars, exactly (the markers' own windows
+# stay open, so they never appear in the output).
 
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT}"
-EXPECTED=708
+EXPECTED=720
 
 [[ -f data/trades.ndjson ]] || python3 tools/mpgen.py --out data
 
-echo "== cluster up (coordinator + 2 workers + kafka)"
+echo "== cluster up, fresh (coordinator + 2 workers + kafka)"
+docker compose -f cluster/docker-compose.yml down -v --remove-orphans >/dev/null 2>&1 || true
 docker compose -f cluster/docker-compose.yml up -d --wait
 
 kexec() { docker compose -f cluster/docker-compose.yml exec -T kafka "$@"; }
@@ -36,6 +41,26 @@ done
 echo "== loading the tape ($(wc -l < data/trades.ndjson | tr -d ' ') trades) onto mp.trades"
 kexec /opt/kafka/bin/kafka-console-producer.sh \
     --bootstrap-server kafka:19092 --topic mp.trades < data/trades.ndjson
+
+echo "== sending end-of-session markers (advance the event clock past the hour)"
+# Keyed production, many distinct keys: an unkeyed producer batches small
+# sends onto a single partition (sticky partitioning), and a partition that
+# never sees a marker keeps its watermark at its own tape tail, holding the
+# job watermark - the minimum across partitions - below the final minute.
+# Sixty-four distinct keys cover four partitions with near certainty.
+python3 - <<'PY' | kexec /opt/kafka/bin/kafka-console-producer.sh \
+    --bootstrap-server kafka:19092 --topic mp.trades \
+    --property parse.key=true --property key.separator='|'
+import json
+m = json.load(open("data/manifest.json"))
+ts = m["base_ts_ms"] + m["minutes"] * 60_000 + 120_000
+symbols = sorted(m["counts"]["per_symbol_trades"])
+for i in range(64):
+    s = symbols[i % len(symbols)]
+    row = {"ts": ts, "symbol": s, "px": 1.0, "qty": 1,
+           "side": "S", "venue": "EOS", "trade_id": 900_000 + i}
+    print(f"eos-{i}|" + json.dumps(row, separators=(",", ":")))
+PY
 
 echo "== submitting cluster/candles_kafka.sql at parallelism 4"
 curl -sf -X POST --data-binary @cluster/candles_kafka.sql \
@@ -55,7 +80,7 @@ while (( SECONDS < deadline )); do
 done
 
 if (( count == EXPECTED )); then
-    echo "gate: OK - exactly ${EXPECTED} bars (12 symbols x 59 closed minutes), no duplicates"
+    echo "gate: OK - exactly ${EXPECTED} bars (12 symbols x 60 closed minutes), no duplicates"
 elif (( count > EXPECTED )); then
     echo "gate: FAILED - ${count} bars on mp.bars, expected exactly ${EXPECTED} (duplicates?)" >&2
     exit 1

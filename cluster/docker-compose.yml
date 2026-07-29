@@ -49,7 +49,7 @@ services:
     command: >
       clink_node --role=worker --id=worker-1
                  --coordinator-host=coordinator --coordinator-port=6123
-                 --data-host=worker1 --slots=4
+                 --data-host=worker1 --slots=16
     environment:
       CLINK_DATA_BIND_HOST: 0.0.0.0
     depends_on:
@@ -64,7 +64,7 @@ services:
     command: >
       clink_node --role=worker --id=worker-2
                  --coordinator-host=coordinator --coordinator-port=6123
-                 --data-host=worker2 --slots=4
+                 --data-host=worker2 --slots=16
     environment:
       CLINK_DATA_BIND_HOST: 0.0.0.0
     depends_on:

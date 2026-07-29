@@ -6,6 +6,12 @@
 -- Kafka JSON sources decode straight to Arrow columns by default
 -- (columnar_decode='false' opts out), and the keyed shuffle moves those
 -- columns between workers without materialising rows.
+--
+-- The coordinator keeps a session catalogue across submissions, so the DDL
+-- drops first: re-running the scene against a live cluster stays idempotent.
+
+DROP TABLE IF EXISTS trades;
+DROP TABLE IF EXISTS bars;
 
 CREATE TABLE trades (
     ts       BIGINT,
