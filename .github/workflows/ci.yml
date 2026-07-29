@@ -1,0 +1,77 @@
+# market-pulse CI: consume the pinned clink release exactly the way the
+# README tells a human to, then run everything that runs without Docker:
+# generate the tape, run the eight SQL scenes with their oracle + golden
+# checks, build the native app against the installed package, run its
+# clink::test_support tests, run the anomaly detector, and run the
+# state-as-data and replay scenes.
+#
+# The clink install (pinned toolchain + engine) is cached on the release
+# tag, so only the first run after a version bump pays the build.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CLINK_VERSION: v0.3.0
+
+jobs:
+  scenes:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore the pinned clink install
+        id: clink-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .clink
+            ~/.clink-deps
+          key: clink-${{ env.CLINK_VERSION }}-${{ runner.os }}-${{ runner.arch }}-v1
+
+      - name: Build tooling
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake ninja-build
+
+      - name: Install the pinned clink release
+        run: scripts/get-clink.sh
+
+      - name: Run the SQL scenes (oracle + golden checks)
+        run: scripts/run-scenes.sh
+
+      - name: Build the native app against the installed package
+        run: |
+          cmake -S app -B app/build -DCMAKE_PREFIX_PATH=$PWD/.clink/prefix
+          cmake --build app/build --parallel 4
+
+      - name: Operator tests (clink::test_support)
+        run: ctest --test-dir app/build --output-on-failure
+
+      - name: Run the anomaly detector, expect exactly the injected fat finger
+        run: |
+          ./app/build/mp_anomaly
+          python3 - <<'PY'
+          import json
+          alerts = [json.loads(l) for l in open("out/alerts.ndjson")]
+          ff = json.load(open("data/manifest.json"))["incidents"]["fat_finger"]
+          assert len(alerts) == 1, f"expected 1 alert, got {len(alerts)}"
+          assert alerts[0]["trade_id"] == ff["trade_id"], (alerts, ff)
+          print("alert matches the injected incident:", alerts[0])
+          PY
+
+      - name: State-as-data scene
+        run: |
+          python3 -m pip install --quiet pyarrow
+          scripts/scene-state-as-data.sh
+
+      - name: Replay scene
+        run: scripts/scene-replay.sh
+
+      - name: Python scene (pyclink over libclink)
+        run: |
+          python3 -m pip install --quiet .clink/src/python
+          CLINK_LIB=$PWD/.clink/prefix/lib/libclink.so python3 python/candles.py
