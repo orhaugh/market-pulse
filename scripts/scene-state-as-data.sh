@@ -29,19 +29,22 @@ echo "== running the totals job with checkpointing (500 ms cadence)"
 "
 
 # The newest checkpoint id, read off the checkpoint directory itself (a
-# bounded run always writes a final checkpoint on drain).
+# bounded run always writes a final checkpoint on drain). A job keeps its
+# snapshots under _state/<job id>/v<generation>/<subtask>/, and the state tools
+# take that generation directory.
 ID="$(find out/state/ckpt -name 'checkpoint-*.snap' \
       | sed -E 's/.*checkpoint-([0-9]+)\.snap/\1/' | sort -n | tail -1)"
-echo "== final checkpoint id: ${ID}"
+STATE_DIR="$(dirname "$(dirname "$(find out/state/ckpt -name "checkpoint-${ID}.snap" | head -1)")")"
+echo "== final checkpoint id: ${ID}, in ${STATE_DIR}"
 
 echo
 echo "== 1. SQL over the snapshot (clink state-query)"
-"${CLINK}" state-query --dir=out/state/ckpt --id="${ID}" \
+"${CLINK}" state-query --dir="${STATE_DIR}" --id="${ID}" \
     --sql="SELECT slot, COUNT(*) AS keys FROM state GROUP BY slot"
 
 echo
 echo "== 2. export the keyed state as Parquet (clink state-export)"
-"${CLINK}" state-export --dir=out/state/ckpt --id="${ID}" \
+"${CLINK}" state-export --dir="${STATE_DIR}" --id="${ID}" \
     --out=out/state/state.parquet --format=parquet
 ls -l out/state/state.parquet
 

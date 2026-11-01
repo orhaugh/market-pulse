@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/orhaugh/market-pulse/actions/workflows/ci.yml/badge.svg)](https://github.com/orhaugh/market-pulse/actions/workflows/ci.yml)
 [![licence](https://img.shields.io/badge/licence-Apache--2.0-blue.svg)](LICENSE)
-[![clink](https://img.shields.io/badge/clink-v0.4.0-lightgrey.svg)](https://github.com/orhaugh/clink/releases/tag/v0.4.0)
+[![clink](https://img.shields.io/badge/clink-v0.13.0-lightgrey.svg)](https://github.com/orhaugh/clink/releases/tag/v0.13.0)
 
 A market-data pipeline built on [clink](https://github.com/orhaugh/clink),
 the embedded-first, Arrow-native stream processing engine. One deterministic
@@ -15,8 +15,9 @@ pinned clink release the way any project would, runs SQL scenes through the
 `clink` CLI, builds a native operator against the installed CMake package,
 and verifies everything against an independent oracle. It doubles as a
 worked example and as an integration test of the release it pins
-(currently **v0.4.0** - its first run against an installed prefix found
-three real defects that were fixed before that release was tagged).
+(currently **v0.13.0**; its first run against an installed prefix, on
+v0.3.0, found three real defects that were fixed before that release was
+tagged).
 
 - [Why a stream engine, and why clink](#why-a-stream-engine-and-why-clink)
 - [Quick start](#quick-start)
@@ -215,7 +216,7 @@ state, golden emissions and a generated test.
 
 ```bash
 export CLINK_LIB=$PWD/.clink/prefix/lib/libclink.dylib   # .so on Linux
-pip install pyarrow "git+https://github.com/orhaugh/clink@v0.4.0#subdirectory=python"
+pip install pyarrow "git+https://github.com/orhaugh/clink@v0.13.0#subdirectory=python"
 python3 python/candles.py
 ```
 
@@ -244,11 +245,6 @@ watermarks while it runs. Kafka JSON decodes straight to Arrow columns and
 the keyed shuffle moves those columns between workers without materialising
 rows.
 
-One honest limitation, called out rather than worked around: SQL jobs
-submitted to a cluster do not yet take a per-job checkpoint configuration
-(compiled-job submissions do), so this scene gates on exact counts instead
-of demonstrating kill-a-worker recovery.
-
 ## The same SQL, on a live feed
 
 ```bash
@@ -257,7 +253,7 @@ LIVE_SYMBOL=ethusdt LIVE_MESSAGES=10000 scripts/scene-live.sh
 BINANCE_HOST=stream.binance.us scripts/scene-live.sh     # geo-restricted regions
 ```
 
-clink v0.4.0's WebSocket source connects straight to a public exchange
+clink's WebSocket source connects straight to a public exchange
 trade stream over `wss://` - no broker, no API key - and the same candle
 query turns live prints into one-minute bars in one process. The venue is
 configurable (`LIVE_URL`/`LIVE_SUBSCRIBE` plus column overrides work for
@@ -283,9 +279,9 @@ replay scenes.
 
 ## Pinning
 
-`scripts/get-clink.sh` pins `CLINK_VERSION` (default v0.4.0) and installs
+`scripts/get-clink.sh` pins `CLINK_VERSION` (default v0.13.0) and installs
 into `.clink/` inside the repository; nothing touches system paths. To try
-a newer clink: `CLINK_VERSION=v0.5.0 scripts/get-clink.sh` and re-run the
+a newer clink: `CLINK_VERSION=<tag> scripts/get-clink.sh` and re-run the
 scenes - the golden checks make regressions visible immediately.
 
 ## Licence
