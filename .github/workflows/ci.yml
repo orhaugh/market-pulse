@@ -7,17 +7,32 @@
 #
 # The clink install (pinned toolchain + engine) is cached on the release
 # tag, so only the first run after a version bump pays the build.
+#
+# A dispatch can run it against another clink: clink_version names a release
+# tag, clink_sdk_run a clink release-binaries dry run, whose SDK tarball (and
+# commit) is tested instead. clink's scripts/check-showcases.sh dispatches
+# that for a release candidate before it is tagged.
 
 name: ci
+# A dispatched run names the clink it ran against; push and pull request runs
+# keep their usual name.
+run-name: "${{ github.event_name == 'workflow_dispatch' && format('ci on clink {0}', inputs.clink_sdk_run && format('SDK run {0}', inputs.clink_sdk_run) || inputs.clink_version || 'pin') || '' }}"
 
 on:
   push:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      clink_version:
+        description: A clink release tag to run against instead of the pin
+        default: ""
+      clink_sdk_run:
+        description: A clink release-binaries dry run (its run id) whose SDK to run against
+        default: ""
 
 env:
-  CLINK_VERSION: v0.15.0
+  CLINK_VERSION: ${{ inputs.clink_version || 'v0.15.0' }}
   # Build the pinned Arrow without the object-store filesystems (s3://,
   # gs://, abfs://) - nothing here uses them, and it is what lets the
   # toolchain build on a bare runner: the prebuilt archive's Arrow was
@@ -39,7 +54,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Not for a clink under test: it installs over the cached prefix, and
+      # a save after a cache miss would file that install under the pin.
       - name: Restore the pinned clink install
+        if: ${{ !inputs.clink_sdk_run }}
         id: clink-cache
         uses: actions/cache@v4
         with:
@@ -60,7 +78,20 @@ jobs:
             libssl-dev libcurl4-openssl-dev libsqlite3-dev libxml2-dev \
             libzstd-dev zlib1g-dev
 
-      - name: Install the pinned clink release
+      - name: Fetch the clink SDK under test
+        if: inputs.clink_sdk_run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ inputs.clink_sdk_run }}
+        run: |
+          gh run download "${RUN}" -R orhaugh/clink -n clink-linux-x86_64-ubuntu24.04 -D "${RUNNER_TEMP}/clink-sdk"
+          sdk="$(ls "${RUNNER_TEMP}"/clink-sdk/clink-*.tar.gz)"
+          commit="$(gh api "repos/orhaugh/clink/actions/runs/${RUN}" --jq .head_sha)"
+          echo "CLINK_SDK=${sdk}" >> "${GITHUB_ENV}"
+          echo "CLINK_COMMIT=${commit}" >> "${GITHUB_ENV}"
+          echo "clink under test: $(basename "${sdk}") from run ${RUN}, commit ${commit}" | tee -a "${GITHUB_STEP_SUMMARY}"
+
+      - name: Install clink (the pin, or the clink under test)
         run: scripts/get-clink.sh
 
       - name: Run the SQL scenes (oracle + golden checks)
@@ -95,10 +126,11 @@ jobs:
         run: scripts/scene-replay.sh
 
       - name: Python scene (pyclink over libclink)
-        # pyclink installs from the pinned tag's python/ subdirectory - the
+        # pyclink installs from the python/ subdirectory of the pinned tag,
+        # or of the commit under test - the
         # SDK fast path never materialises a source checkout, and the SDK
         # already carries the libclink.so the package drives.
         run: |
           CLINK_LIB=$PWD/.clink/prefix/lib/libclink.so \
-            python3 -m pip install --quiet pyarrow "git+https://github.com/orhaugh/clink@${CLINK_VERSION}#subdirectory=python"
+            python3 -m pip install --quiet pyarrow "git+https://github.com/orhaugh/clink@${CLINK_COMMIT:-${CLINK_VERSION}}#subdirectory=python"
           CLINK_LIB=$PWD/.clink/prefix/lib/libclink.so python3 python/candles.py

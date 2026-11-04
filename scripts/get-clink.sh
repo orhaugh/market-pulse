@@ -17,6 +17,12 @@
 #                      Arrow's S3 symbols unconditionally, so it cannot link
 #                      against a no-S3 Arrow. Nothing here uses Iceberg.
 #   CLINK_CMAKE_ARGS   extra arguments appended to the clink configure line
+#   CLINK_SDK          path to a prebuilt SDK tarball
+#                      (clink-<version>-linux-x86_64-ubuntu24.04.tar.gz) to
+#                      install instead of the release: a release's asset, or
+#                      the one a clink release-binaries dry run uploads. CI
+#                      uses it to run this project against a clink release
+#                      candidate before it is tagged.
 #
 # Idempotent: re-running against an existing matching install is a no-op.
 
@@ -32,6 +38,39 @@ STAMP="${PREFIX}/.market-pulse-installed"
 
 ncpu="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)"
 JOBS="${CLINK_JOBS:-$(( ncpu < 10 ? ncpu : 10 ))}"
+
+install_sdk() {
+    # $1 = SDK tarball, $2 = stamp contents. Verifies the tarball against the
+    # .sha256 beside it when there is one, then unpacks it as the prefix.
+    local tarball="$1" stamp="$2"
+    local dir name tmp
+    dir="$(cd "$(dirname "${tarball}")" && pwd)"
+    name="$(basename "${tarball}")"
+    if [[ -f "${dir}/${name}.sha256" ]]; then
+        ( cd "${dir}" && sha256sum -c "${name}.sha256" >/dev/null )
+    fi
+    tmp="$(mktemp -d)"
+    tar xzf "${tarball}" -C "${tmp}"
+    mkdir -p "${ROOT}/.clink"
+    rm -rf "${PREFIX}"
+    mv "${tmp}/${name%.tar.gz}" "${PREFIX}"
+    rm -rf "${tmp}"
+    echo "${stamp}" > "${STAMP}"
+    echo "== clink ${stamp} installed from the prebuilt SDK."
+    echo "   CLI:            ${PREFIX}/bin/clink"
+    echo "   CMake package:  ${PREFIX}/lib/cmake/clink (use -DCMAKE_PREFIX_PATH=${PREFIX})"
+}
+
+if [[ -n "${CLINK_SDK:-}" ]]; then
+    want="sdk:$(basename "${CLINK_SDK}" .tar.gz)"
+    if [[ -x "${PREFIX}/bin/clink" && -f "${STAMP}" ]] && grep -qx "${want}" "${STAMP}"; then
+        echo "clink ${want} already installed at ${PREFIX}"
+        exit 0
+    fi
+    echo "== market-pulse: installing clink from ${CLINK_SDK}"
+    install_sdk "${CLINK_SDK}" "${want}"
+    exit 0
+fi
 
 if [[ -x "${PREFIX}/bin/clink" && -f "${STAMP}" ]] \
    && grep -qx "${CLINK_VERSION}" "${STAMP}"; then
@@ -53,16 +92,8 @@ if [[ "${CLINK_FROM_SOURCE:-0}" != "1" && "$(uname -s)" == "Linux" && "$(uname -
     echo "-- trying the prebuilt SDK: ${base}/${asset}"
     if curl -fsSL -o "${tmp}/${asset}" "${base}/${asset}" \
        && curl -fsSL -o "${tmp}/${asset}.sha256" "${base}/${asset}.sha256"; then
-        ( cd "${tmp}" && sha256sum -c "${asset}.sha256" >/dev/null )
-        mkdir -p "${ROOT}/.clink"
-        rm -rf "${PREFIX}"
-        tar xzf "${tmp}/${asset}" -C "${tmp}"
-        mv "${tmp}/${asset%.tar.gz}" "${PREFIX}"
+        install_sdk "${tmp}/${asset}" "${CLINK_VERSION}"
         rm -rf "${tmp}"
-        echo "${CLINK_VERSION}" > "${STAMP}"
-        echo "== clink ${CLINK_VERSION} installed from the prebuilt SDK."
-        echo "   CLI:            ${PREFIX}/bin/clink"
-        echo "   CMake package:  ${PREFIX}/lib/cmake/clink (use -DCMAKE_PREFIX_PATH=${PREFIX})"
         exit 0
     fi
     rm -rf "${tmp}"
