@@ -15,9 +15,10 @@ Two kinds of check:
 Exit code 0 only if every check passes.
 """
 
+import bisect
 import json
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -98,6 +99,42 @@ def main() -> int:
     check("spreads: v-shape window widens the relative spread",
           2.0 < ratio < 4.0, f"ratio {ratio:.2f}, injected 3.0")
 
+    # 03 against an oracle of the join, computed from the tape. A punctual
+    # trade pairs with exactly the quotes of its symbol from the 300 ms
+    # before it. A late trade pairs only with its own quotes, each at most
+    # once, but not necessarily with all of them: whether they are still
+    # buffered when it arrives depends on how far the join's watermark (the
+    # slower of its two inputs) has moved, and so on how the two file reads
+    # interleave. That is why the row count is not a golden figure.
+    late_ids = set(manifest["counts"]["late_trade_ids"])
+    quotes_of = defaultdict(list)
+    with open(ROOT / "data" / "quotes.ndjson") as f:
+        for line in f:
+            q = json.loads(line)
+            quotes_of[q["symbol"]].append((q["ts"], q["bid"], q["ask"]))
+    for qs in quotes_of.values():
+        qs.sort()
+    want = {}
+    with open(ROOT / "data" / "trades.ndjson") as f:
+        for line in f:
+            t = json.loads(line)
+            qs = quotes_of[t["symbol"]]
+            lo = bisect.bisect_left(qs, (t["ts"] - 300,))
+            hi = bisect.bisect_right(qs, (t["ts"], float("inf"), float("inf")))
+            want[t["trade_id"]] = Counter((bid, ask) for _, bid, ask in qs[lo:hi])
+    got = defaultdict(Counter)
+    for s in spreads:
+        got[s["trade_id"]][(s["bid"], s["ask"])] += 1
+    punctual = [i for i in want if i not in late_ids]
+    check("spreads: every punctual trade pairs with exactly its quotes",
+          all(got.get(i, Counter()) == want[i] for i in punctual)
+          and set(got) <= set(want),
+          f"{sum(sum(want[i].values()) for i in punctual)} rows")
+    late_rows = sum(sum(got[i].values()) for i in late_ids if i in got)
+    check("spreads: a late trade pairs only with its own quotes, each once",
+          all(not (got[i] - want[i]) for i in late_ids if i in got),
+          f"{late_rows} of {sum(sum(want[i].values()) for i in late_ids)} possible")
+
     # 04: the injected reversal is found on the right symbol at the right time.
     hits = [r for r in reversals if r["symbol"] == v["symbol"]
             and r["from_ts"] >= v["from_ts"] - 120_000
@@ -148,7 +185,7 @@ def main() -> int:
     snapshot = {
         "bars_rows": len(bars), "bars_sum_n": n_sum,
         "bars_lateness_sum_n": n_sum_late,
-        "leaders_rows": len(leaders), "spreads_rows": len(spreads),
+        "leaders_rows": len(leaders),
         "reversals_rows": len(reversals), "sessions_rows": len(sessions),
         "volume_board_rows": len(board), "running_rows": len(running),
     }

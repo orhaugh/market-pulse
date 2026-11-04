@@ -272,10 +272,16 @@ generator. The tape verifies; the feed demonstrates.
 `tools/check.py` recomputes what the scenes should have produced - totals
 from the raw tape, incident coordinates from the manifest - and compares,
 then pins exact golden figures for the default seed
-(`tests/expected_seed42.json`). CI runs the whole tour on every push:
-install the pinned release, run the scenes, build the app, run its tests,
-match the detector's alert against the manifest, and run the state and
-replay scenes.
+(`tests/expected_seed42.json`). The spread join is held to the tape pair by
+pair rather than to a frozen row count: every punctual trade pairs with
+exactly its quotes, while a late trade pairs with those of its quotes the
+join still holds when it arrives, which depends on how the two file reads
+interleave. CI runs the whole tour on every push: install the pinned
+release, run the scenes, build the app, run its tests, match the detector's
+alert against the manifest, and run the state and replay scenes. A dispatch
+runs the same against another clink, a release tag or the SDK a clink
+release-binaries dry run built, which is how clink checks a release
+candidate before tagging it.
 
 ## Pinning
 
