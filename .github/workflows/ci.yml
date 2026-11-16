@@ -32,7 +32,7 @@ on:
         default: ""
 
 env:
-  CLINK_VERSION: ${{ inputs.clink_version || 'v0.16.0' }}
+  CLINK_VERSION: ${{ inputs.clink_version || 'v0.16.1' }}
   # Build the pinned Arrow without the object-store filesystems (s3://,
   # gs://, abfs://) - nothing here uses them, and it is what lets the
   # toolchain build on a bare runner: the prebuilt archive's Arrow was
